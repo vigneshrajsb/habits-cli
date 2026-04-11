@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
 import {
   getConfig,
@@ -7,6 +9,11 @@ import {
   initDb,
   updateConfig,
 } from "./db";
+
+const VERSION = JSON.parse(
+  readFileSync(join(import.meta.dir, "../package.json"), "utf-8"),
+).version;
+
 import * as habits from "./habits";
 import * as journal from "./journal";
 
@@ -47,6 +54,7 @@ COMMANDS:
 OPTIONS:
   --json                    Output as JSON
   --date YYYY-MM-DD         Specify date (default: today)
+  --version, -v             Show version
   --help, -h                Show this help
 
 EXAMPLES:
@@ -372,6 +380,11 @@ async function main() {
 
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
     console.log(HELP);
+    return;
+  }
+
+  if (args[0] === "--version" || args[0] === "-v") {
+    console.log(VERSION);
     return;
   }
 
