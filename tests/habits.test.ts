@@ -1,18 +1,18 @@
-import { describe, test, expect, beforeEach, beforeAll } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
 process.env.HABITS_TEST = "1";
 
-import { initDb, getDb } from "../src/db";
+import { getDb, initDb } from "../src/db";
 import {
+  activateHabit,
   addHabit,
-  listHabits,
+  deactivateHabit,
   getHabit,
-  logHabit,
-  unlogHabit,
   getLogsForDate,
   getStreak,
-  deactivateHabit,
-  activateHabit,
+  listHabits,
+  logHabit,
+  unlogHabit,
   updateHabit,
 } from "../src/habits";
 
@@ -102,7 +102,7 @@ describe("logHabit / unlogHabit", () => {
     expect(result).toBe(true);
 
     const logs = await getLogsForDate();
-    const exerciseLog = logs.find(l => l.habit.id === habit.id);
+    const exerciseLog = logs.find((l) => l.habit.id === habit.id);
     expect(exerciseLog?.logged).toBe(true);
   });
 
@@ -113,7 +113,7 @@ describe("logHabit / unlogHabit", () => {
     expect(result).toBe(true);
 
     const logs = await getLogsForDate("2026-01-15");
-    const exerciseLog = logs.find(l => l.habit.id === habit.id);
+    const exerciseLog = logs.find((l) => l.habit.id === habit.id);
     expect(exerciseLog?.logged).toBe(true);
   });
 
@@ -125,7 +125,7 @@ describe("logHabit / unlogHabit", () => {
     expect(result).toBe(true);
 
     const logs = await getLogsForDate("2026-01-15");
-    const exerciseLog = logs.find(l => l.habit.id === habit.id);
+    const exerciseLog = logs.find((l) => l.habit.id === habit.id);
     expect(exerciseLog?.logged).toBe(false);
   });
 
@@ -144,8 +144,8 @@ describe("getLogsForDate", () => {
     const logs = await getLogsForDate("2026-01-15");
 
     expect(logs.length).toBe(2);
-    expect(logs.find(l => l.habit.id === h1.id)?.logged).toBe(true);
-    expect(logs.find(l => l.habit.id === h2.id)?.logged).toBe(false);
+    expect(logs.find((l) => l.habit.id === h1.id)?.logged).toBe(true);
+    expect(logs.find((l) => l.habit.id === h2.id)?.logged).toBe(false);
   });
 });
 

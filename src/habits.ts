@@ -1,4 +1,4 @@
-import { getDb, getConfig } from "./db";
+import { getConfig, getDb } from "./db";
 
 export interface Habit {
   id: number;
@@ -36,15 +36,23 @@ function today(): string {
   return `${year}-${month}-${day}`;
 }
 
-export async function addHabit(name: string, emoji?: string, frequency: string = "daily"): Promise<Habit> {
+export async function addHabit(
+  name: string,
+  emoji?: string,
+  frequency: string = "daily",
+): Promise<Habit> {
   const db = await getDb();
   return (await db.get<Habit>(
     "INSERT INTO habits (name, emoji, frequency) VALUES (?, ?, ?) RETURNING *",
-    name, emoji || null, frequency
+    name,
+    emoji || null,
+    frequency,
   ))!;
 }
 
-export async function listHabits(includeInactive: boolean = false): Promise<Habit[]> {
+export async function listHabits(
+  includeInactive: boolean = false,
+): Promise<Habit[]> {
   const db = await getDb();
   const query = includeInactive
     ? "SELECT * FROM habits ORDER BY created_at"
@@ -52,15 +60,22 @@ export async function listHabits(includeInactive: boolean = false): Promise<Habi
   return db.all<Habit>(query);
 }
 
-export async function getHabit(nameOrId: string | number): Promise<Habit | null> {
+export async function getHabit(
+  nameOrId: string | number,
+): Promise<Habit | null> {
   const db = await getDb();
   return db.get<Habit>(
     "SELECT * FROM habits WHERE id = ? OR LOWER(name) = LOWER(?)",
-    nameOrId, nameOrId
+    nameOrId,
+    nameOrId,
   );
 }
 
-export async function logHabit(nameOrId: string | number, date?: string, notes?: string): Promise<boolean> {
+export async function logHabit(
+  nameOrId: string | number,
+  date?: string,
+  notes?: string,
+): Promise<boolean> {
   const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
@@ -68,22 +83,33 @@ export async function logHabit(nameOrId: string | number, date?: string, notes?:
   const logDate = date || today();
   await db.run(
     "INSERT OR REPLACE INTO habit_logs (habit_id, logged_at, notes) VALUES (?, ?, ?)",
-    habit.id, logDate, notes || null
+    habit.id,
+    logDate,
+    notes || null,
   );
   return true;
 }
 
-export async function unlogHabit(nameOrId: string | number, date?: string): Promise<boolean> {
+export async function unlogHabit(
+  nameOrId: string | number,
+  date?: string,
+): Promise<boolean> {
   const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
   const db = await getDb();
   const logDate = date || today();
-  await db.run("DELETE FROM habit_logs WHERE habit_id = ? AND logged_at = ?", habit.id, logDate);
+  await db.run(
+    "DELETE FROM habit_logs WHERE habit_id = ? AND logged_at = ?",
+    habit.id,
+    logDate,
+  );
   return true;
 }
 
-export async function getLogsForDate(date?: string): Promise<{ habit: Habit; logged: boolean; notes: string | null }[]> {
+export async function getLogsForDate(
+  date?: string,
+): Promise<{ habit: Habit; logged: boolean; notes: string | null }[]> {
   const db = await getDb();
   const targetDate = date || today();
   const habits = await listHabits();
@@ -92,7 +118,8 @@ export async function getLogsForDate(date?: string): Promise<{ habit: Habit; log
   for (const habit of habits) {
     const log = await db.get<HabitLog>(
       "SELECT * FROM habit_logs WHERE habit_id = ? AND logged_at = ?",
-      habit.id, targetDate
+      habit.id,
+      targetDate,
     );
     results.push({
       habit,
@@ -103,7 +130,10 @@ export async function getLogsForDate(date?: string): Promise<{ habit: Habit; log
   return results;
 }
 
-export async function logMultiple(indices: number[], date?: string): Promise<{ logged: string[]; failed: string[] }> {
+export async function logMultiple(
+  indices: number[],
+  date?: string,
+): Promise<{ logged: string[]; failed: string[] }> {
   const habits = await listHabits();
   const logged: string[] = [];
   const failed: string[] = [];
@@ -150,7 +180,7 @@ export async function getStreak(nameOrId: string | number): Promise<number> {
   const db = await getDb();
   const logs = await db.all<{ logged_at: string }>(
     "SELECT logged_at FROM habit_logs WHERE habit_id = ? ORDER BY logged_at DESC",
-    habit.id
+    habit.id,
   );
 
   if (logs.length === 0) return 0;
@@ -173,7 +203,9 @@ export async function getStreak(nameOrId: string | number): Promise<number> {
   return streak;
 }
 
-export async function deactivateHabit(nameOrId: string | number): Promise<boolean> {
+export async function deactivateHabit(
+  nameOrId: string | number,
+): Promise<boolean> {
   const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
@@ -182,7 +214,9 @@ export async function deactivateHabit(nameOrId: string | number): Promise<boolea
   return true;
 }
 
-export async function activateHabit(nameOrId: string | number): Promise<boolean> {
+export async function activateHabit(
+  nameOrId: string | number,
+): Promise<boolean> {
   const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
@@ -191,16 +225,27 @@ export async function activateHabit(nameOrId: string | number): Promise<boolean>
   return true;
 }
 
-export async function updateHabit(nameOrId: string | number, updates: { name?: string; emoji?: string }): Promise<boolean> {
+export async function updateHabit(
+  nameOrId: string | number,
+  updates: { name?: string; emoji?: string },
+): Promise<boolean> {
   const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
   const db = await getDb();
   if (updates.name) {
-    await db.run("UPDATE habits SET name = ? WHERE id = ?", updates.name, habit.id);
+    await db.run(
+      "UPDATE habits SET name = ? WHERE id = ?",
+      updates.name,
+      habit.id,
+    );
   }
   if (updates.emoji) {
-    await db.run("UPDATE habits SET emoji = ? WHERE id = ?", updates.emoji, habit.id);
+    await db.run(
+      "UPDATE habits SET emoji = ? WHERE id = ?",
+      updates.emoji,
+      habit.id,
+    );
   }
   return true;
 }

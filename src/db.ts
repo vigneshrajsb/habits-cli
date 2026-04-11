@@ -1,7 +1,13 @@
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 const isTest = process.env.HABITS_TEST === "1";
 const DATA_DIR = isTest ? "/tmp/habits-test" : join(homedir(), ".habits");
@@ -119,7 +125,10 @@ class TursoDbClient implements DbClient {
   }
 }
 
-function rowToObject<T>(row: import("@libsql/client").Row, columns: string[]): T {
+function rowToObject<T>(
+  row: import("@libsql/client").Row,
+  columns: string[],
+): T {
   const obj: any = {};
   for (let i = 0; i < columns.length; i++) {
     obj[columns[i]!] = row[i];
@@ -131,7 +140,10 @@ function rowToObject<T>(row: import("@libsql/client").Row, columns: string[]): T
 
 let _db: DbClient | null = null;
 
-export function getTursoCredentials(): { url: string; authToken: string } | null {
+export function getTursoCredentials(): {
+  url: string;
+  authToken: string;
+} | null {
   const envUrl = process.env.TURSO_DATABASE_URL;
   const envToken = process.env.TURSO_AUTH_TOKEN;
   if (envUrl && envToken) {
@@ -150,13 +162,15 @@ export async function getDb(): Promise<DbClient> {
   if (_db) return _db;
 
   const config = getConfig();
-  const backend = isTest ? "local" : (config.backend || "local");
+  const backend = isTest ? "local" : config.backend || "local";
 
   if (backend === "turso") {
     const creds = getTursoCredentials();
     if (!creds) {
       console.error("Turso backend configured but no credentials found.");
-      console.error("Run `habits setup` or set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN env vars.");
+      console.error(
+        "Run `habits setup` or set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN env vars.",
+      );
       process.exit(1);
     }
 
@@ -178,7 +192,7 @@ export async function getDb(): Promise<DbClient> {
 // For tests that need direct access to reset state
 export async function getRawDb(): Promise<Database | null> {
   const config = getConfig();
-  const backend = isTest ? "local" : (config.backend || "local");
+  const backend = isTest ? "local" : config.backend || "local";
   if (backend === "local" || isTest) {
     const db = await getDb();
     return (db as any).db as Database;
@@ -221,7 +235,9 @@ export async function initDb() {
     )
   `);
 
-  await db.run(`CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(logged_at)`);
+  await db.run(
+    `CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(logged_at)`,
+  );
   await db.run(`CREATE INDEX IF NOT EXISTS idx_journal_date ON journal(date)`);
 }
 

@@ -1,6 +1,12 @@
 #!/usr/bin/env bun
-import { parseArgs } from "util";
-import { initDb, getDbPath, getReplicaPath, getConfig, updateConfig } from "./db";
+import { parseArgs } from "node:util";
+import {
+  getConfig,
+  getDbPath,
+  getReplicaPath,
+  initDb,
+  updateConfig,
+} from "./db";
 import * as habits from "./habits";
 import * as journal from "./journal";
 
@@ -55,12 +61,16 @@ EXAMPLES:
 `;
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + "T12:00:00");
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const d = new Date(`${dateStr}T12:00:00`);
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function formatDateShort(dateStr: string): string {
-  const d = new Date(dateStr + "T12:00:00");
+  const d = new Date(`${dateStr}T12:00:00`);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
@@ -102,19 +112,25 @@ async function showToday(asJson: boolean, date?: string) {
   const entry = await journal.getEntry(targetDate);
 
   if (asJson) {
-    console.log(JSON.stringify({
-      date: targetDate,
-      habits: habitLogs.map((h, i) => ({
-        num: i + 1,
-        name: h.habit.name,
-        emoji: h.habit.emoji,
-        logged: h.logged,
-        notes: h.notes,
-      })),
-      mood: entry?.mood || null,
-      moodEmoji: journal.moodToEmoji(entry?.mood || null),
-      journal: entry?.content || null,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          date: targetDate,
+          habits: habitLogs.map((h, i) => ({
+            num: i + 1,
+            name: h.habit.name,
+            emoji: h.habit.emoji,
+            logged: h.logged,
+            notes: h.notes,
+          })),
+          mood: entry?.mood || null,
+          moodEmoji: journal.moodToEmoji(entry?.mood || null),
+          journal: entry?.content || null,
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
@@ -132,7 +148,9 @@ async function showToday(asJson: boolean, date?: string) {
   }
 
   console.log("");
-  const moodStr = entry?.mood ? `${entry.mood} ${journal.moodToEmoji(entry.mood)}` : "(not set)";
+  const moodStr = entry?.mood
+    ? `${entry.mood} ${journal.moodToEmoji(entry.mood)}`
+    : "(not set)";
   console.log(`Mood: ${moodStr}`);
 
   console.log("");
@@ -173,7 +191,11 @@ async function showDaysHistory(numDays: number, asJson: boolean) {
 
   console.log(`\n📊 Last ${numDays} Days\n`);
 
-  const header = ["Date", ...allHabits.map((h) => h.emoji || h.name.slice(0, 3)), "Mood"];
+  const header = [
+    "Date",
+    ...allHabits.map((h) => h.emoji || h.name.slice(0, 3)),
+    "Mood",
+  ];
   console.log(header.join("\t"));
   console.log("-".repeat(50));
 
@@ -186,13 +208,19 @@ async function showDaysHistory(numDays: number, asJson: boolean) {
   console.log("");
 }
 
-async function showHabitStreak(habitName: string | null, numDays: number, asJson: boolean) {
+async function showHabitStreak(
+  habitName: string | null,
+  numDays: number,
+  asJson: boolean,
+) {
   const targetHabits = habitName
-    ? [await habits.getHabit(habitName)].filter(Boolean) as habits.Habit[]
+    ? ([await habits.getHabit(habitName)].filter(Boolean) as habits.Habit[])
     : await habits.listHabits();
 
   if (targetHabits.length === 0) {
-    console.error(habitName ? `❌ Habit not found: ${habitName}` : "No habits configured.");
+    console.error(
+      habitName ? `❌ Habit not found: ${habitName}` : "No habits configured.",
+    );
     process.exit(1);
   }
 
@@ -227,7 +255,9 @@ async function showHabitStreak(habitName: string | null, numDays: number, asJson
   for (const r of results) {
     const visual = r.days.map((d: any) => (d.logged ? "✅" : "⬜")).join("");
     const emoji = r.emoji || "•";
-    console.log(`${emoji} ${r.habit}: ${visual} (${r.currentStreak} day streak)`);
+    console.log(
+      `${emoji} ${r.habit}: ${visual} (${r.currentStreak} day streak)`,
+    );
   }
   console.log("");
 }
@@ -262,8 +292,12 @@ async function showMoodHistory(numDays: number, asJson: boolean) {
 
   const moodsWithValues = days.filter((d) => d.mood !== null);
   if (moodsWithValues.length > 0) {
-    const avg = moodsWithValues.reduce((sum, d) => sum + (d.mood || 0), 0) / moodsWithValues.length;
-    console.log(`Average: ${avg.toFixed(1)} ${journal.moodToEmoji(Math.round(avg))}`);
+    const avg =
+      moodsWithValues.reduce((sum, d) => sum + (d.mood || 0), 0) /
+      moodsWithValues.length;
+    console.log(
+      `Average: ${avg.toFixed(1)} ${journal.moodToEmoji(Math.round(avg))}`,
+    );
   }
   console.log("");
 }
@@ -311,10 +345,17 @@ async function showMonthHistory(mmyy: string | null, asJson: boolean) {
     return;
   }
 
-  const monthName = new Date(year, month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthName = new Date(year, month - 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
   console.log(`\n📅 ${monthName}\n`);
 
-  const header = ["Day", ...allHabits.map((h) => h.emoji || h.name.slice(0, 3)), "Mood"];
+  const header = [
+    "Day",
+    ...allHabits.map((h) => h.emoji || h.name.slice(0, 3)),
+    "Mood",
+  ];
   console.log(header.join("\t"));
   console.log("-".repeat(50));
 
@@ -381,11 +422,19 @@ async function main() {
       const config = getConfig();
       const backend = config.backend || "local";
       if (asJson) {
-        console.log(JSON.stringify({
-          backend,
-          path: backend === "turso" ? getReplicaPath() : getDbPath(),
-          ...(backend === "turso" ? { remote: config.turso?.url || "(env vars)" } : {}),
-        }, null, 2));
+        console.log(
+          JSON.stringify(
+            {
+              backend,
+              path: backend === "turso" ? getReplicaPath() : getDbPath(),
+              ...(backend === "turso"
+                ? { remote: config.turso?.url || "(env vars)" }
+                : {}),
+            },
+            null,
+            2,
+          ),
+        );
       } else {
         console.log(`\nBackend: ${backend}`);
         if (backend === "turso") {
@@ -466,10 +515,16 @@ async function main() {
     case "add": {
       const name = positionals[1];
       if (!name) {
-        console.error("Usage: habits add <name> [--emoji X] [--frequency daily|weekly]");
+        console.error(
+          "Usage: habits add <name> [--emoji X] [--frequency daily|weekly]",
+        );
         process.exit(1);
       }
-      const habit = await habits.addHabit(name, values.emoji as string, values.frequency as string);
+      const habit = await habits.addHabit(
+        name,
+        values.emoji as string,
+        values.frequency as string,
+      );
       if (asJson) {
         console.log(JSON.stringify(habit, null, 2));
       } else {
@@ -481,12 +536,20 @@ async function main() {
     case "log": {
       const target = positionals[1];
       if (!target) {
-        console.error("Usage: habits log <name|number> [--date YYYY-MM-DD] [--notes text]");
+        console.error(
+          "Usage: habits log <name|number> [--date YYYY-MM-DD] [--notes text]",
+        );
         process.exit(1);
       }
-      const success = await habits.logHabit(target, date, values.notes as string);
+      const success = await habits.logHabit(
+        target,
+        date,
+        values.notes as string,
+      );
       if (asJson) {
-        console.log(JSON.stringify({ success, habit: target, date: date || "today" }));
+        console.log(
+          JSON.stringify({ success, habit: target, date: date || "today" }),
+        );
       } else if (success) {
         console.log(`✅ Logged: ${target}`);
       } else {
@@ -520,7 +583,10 @@ async function main() {
         console.error("Usage: habits done <1,2,3>");
         process.exit(1);
       }
-      const indices = nums.split(",").map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
+      const indices = nums
+        .split(",")
+        .map((n) => parseInt(n.trim(), 10))
+        .filter((n) => !Number.isNaN(n));
       const result = await habits.logMultiple(indices, date);
       if (asJson) {
         console.log(JSON.stringify(result, null, 2));
@@ -544,7 +610,7 @@ async function main() {
 
       if (arg1) {
         const maybeNum = parseInt(arg1, 10);
-        if (!isNaN(maybeNum)) {
+        if (!Number.isNaN(maybeNum)) {
           numDays = maybeNum;
         } else {
           habitName = arg1;
@@ -599,7 +665,9 @@ async function main() {
         case "write": {
           const content = positionals.slice(2).join(" ");
           if (!content) {
-            console.error("Usage: habits journal write <text> [--date YYYY-MM-DD]");
+            console.error(
+              "Usage: habits journal write <text> [--date YYYY-MM-DD]",
+            );
             process.exit(1);
           }
           const entry = await journal.writeJournal(content, date);
@@ -612,7 +680,9 @@ async function main() {
         }
 
         case "read": {
-          const last = values.last ? parseInt(values.last as string, 10) : undefined;
+          const last = values.last
+            ? parseInt(values.last as string, 10)
+            : undefined;
           if (last) {
             const entries = await journal.getRecentEntries(last);
             if (asJson) {
@@ -629,7 +699,9 @@ async function main() {
             if (asJson) {
               console.log(JSON.stringify(entry, null, 2));
             } else if (entry) {
-              const mood = entry.mood ? ` ${journal.moodToEmoji(entry.mood)}` : "";
+              const mood = entry.mood
+                ? ` ${journal.moodToEmoji(entry.mood)}`
+                : "";
               console.log(`\n📅 ${formatDate(entry.date)}${mood}`);
               console.log(entry.content || "(empty)");
             } else {
@@ -654,7 +726,10 @@ async function main() {
             } else {
               results.forEach((e) => {
                 console.log(`\n📅 ${formatDate(e.date)}`);
-                console.log(e.content?.slice(0, 100) + (e.content && e.content.length > 100 ? "..." : ""));
+                console.log(
+                  e.content?.slice(0, 100) +
+                    (e.content && e.content.length > 100 ? "..." : ""),
+                );
               });
             }
           }
@@ -674,7 +749,7 @@ async function main() {
         await showMoodHistory(numDays, asJson);
       } else {
         const moodVal = parseInt(positionals[1] ?? "", 10);
-        if (isNaN(moodVal) || moodVal < 1 || moodVal > 5) {
+        if (Number.isNaN(moodVal) || moodVal < 1 || moodVal > 5) {
           console.error("Usage: habits mood <1-5> [--date YYYY-MM-DD]");
           console.error("       habits mood history [days]");
           console.log("  1 = 😞  2 = 😕  3 = 😐  4 = 🙂  5 = 😄");
@@ -684,7 +759,9 @@ async function main() {
         if (asJson) {
           console.log(JSON.stringify(entry, null, 2));
         } else {
-          console.log(`✅ Mood set: ${moodVal} ${journal.moodToEmoji(moodVal)}`);
+          console.log(
+            `✅ Mood set: ${moodVal} ${journal.moodToEmoji(moodVal)}`,
+          );
         }
       }
       break;

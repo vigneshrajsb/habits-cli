@@ -1,4 +1,4 @@
-import { getDb, getConfig } from "./db";
+import { getConfig, getDb } from "./db";
 
 export interface JournalEntry {
   id: number;
@@ -44,10 +44,16 @@ function today(): string {
 export async function getEntry(date?: string): Promise<JournalEntry | null> {
   const db = await getDb();
   const targetDate = date || today();
-  return db.get<JournalEntry>("SELECT * FROM journal WHERE date = ?", targetDate);
+  return db.get<JournalEntry>(
+    "SELECT * FROM journal WHERE date = ?",
+    targetDate,
+  );
 }
 
-export async function writeJournal(content: string, date?: string): Promise<JournalEntry> {
+export async function writeJournal(
+  content: string,
+  date?: string,
+): Promise<JournalEntry> {
   const db = await getDb();
   const targetDate = date || today();
   const existing = await getEntry(targetDate);
@@ -55,19 +61,24 @@ export async function writeJournal(content: string, date?: string): Promise<Jour
   if (existing) {
     await db.run(
       "UPDATE journal SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE date = ?",
-      content, targetDate
+      content,
+      targetDate,
     );
   } else {
     await db.run(
       "INSERT INTO journal (date, content) VALUES (?, ?)",
-      targetDate, content
+      targetDate,
+      content,
     );
   }
 
   return (await getEntry(targetDate))!;
 }
 
-export async function appendJournal(content: string, date?: string): Promise<JournalEntry> {
+export async function appendJournal(
+  content: string,
+  date?: string,
+): Promise<JournalEntry> {
   const db = await getDb();
   const targetDate = date || today();
   const existing = await getEntry(targetDate);
@@ -78,19 +89,24 @@ export async function appendJournal(content: string, date?: string): Promise<Jou
       : content;
     await db.run(
       "UPDATE journal SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE date = ?",
-      newContent, targetDate
+      newContent,
+      targetDate,
     );
   } else {
     await db.run(
       "INSERT INTO journal (date, content) VALUES (?, ?)",
-      targetDate, content
+      targetDate,
+      content,
     );
   }
 
   return (await getEntry(targetDate))!;
 }
 
-export async function setMood(mood: number, date?: string): Promise<JournalEntry> {
+export async function setMood(
+  mood: number,
+  date?: string,
+): Promise<JournalEntry> {
   if (mood < 1 || mood > 5) {
     throw new Error("Mood must be between 1 and 5");
   }
@@ -102,16 +118,24 @@ export async function setMood(mood: number, date?: string): Promise<JournalEntry
   if (existing) {
     await db.run(
       "UPDATE journal SET mood = ?, updated_at = CURRENT_TIMESTAMP WHERE date = ?",
-      mood, targetDate
+      mood,
+      targetDate,
     );
   } else {
-    await db.run("INSERT INTO journal (date, mood) VALUES (?, ?)", targetDate, mood);
+    await db.run(
+      "INSERT INTO journal (date, mood) VALUES (?, ?)",
+      targetDate,
+      mood,
+    );
   }
 
   return (await getEntry(targetDate))!;
 }
 
-export async function replaceJournal(content: string, date?: string): Promise<JournalEntry> {
+export async function replaceJournal(
+  content: string,
+  date?: string,
+): Promise<JournalEntry> {
   const db = await getDb();
   const targetDate = date || today();
   const existing = await getEntry(targetDate);
@@ -119,35 +143,50 @@ export async function replaceJournal(content: string, date?: string): Promise<Jo
   if (existing) {
     await db.run(
       "UPDATE journal SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE date = ?",
-      content, targetDate
+      content,
+      targetDate,
     );
   } else {
     await db.run(
       "INSERT INTO journal (date, content) VALUES (?, ?)",
-      targetDate, content
+      targetDate,
+      content,
     );
   }
 
   return (await getEntry(targetDate))!;
 }
 
-export async function getRecentEntries(limit: number = 7): Promise<JournalEntry[]> {
-  const db = await getDb();
-  return db.all<JournalEntry>("SELECT * FROM journal ORDER BY date DESC LIMIT ?", limit);
-}
-
-export async function searchJournal(query: string, limit: number = 10): Promise<JournalEntry[]> {
+export async function getRecentEntries(
+  limit: number = 7,
+): Promise<JournalEntry[]> {
   const db = await getDb();
   return db.all<JournalEntry>(
-    "SELECT * FROM journal WHERE content LIKE ? ORDER BY date DESC LIMIT ?",
-    `%${query}%`, limit
+    "SELECT * FROM journal ORDER BY date DESC LIMIT ?",
+    limit,
   );
 }
 
-export async function getEntriesInRange(startDate: string, endDate: string): Promise<JournalEntry[]> {
+export async function searchJournal(
+  query: string,
+  limit: number = 10,
+): Promise<JournalEntry[]> {
+  const db = await getDb();
+  return db.all<JournalEntry>(
+    "SELECT * FROM journal WHERE content LIKE ? ORDER BY date DESC LIMIT ?",
+    `%${query}%`,
+    limit,
+  );
+}
+
+export async function getEntriesInRange(
+  startDate: string,
+  endDate: string,
+): Promise<JournalEntry[]> {
   const db = await getDb();
   return db.all<JournalEntry>(
     "SELECT * FROM journal WHERE date >= ? AND date <= ? ORDER BY date",
-    startDate, endDate
+    startDate,
+    endDate,
   );
 }

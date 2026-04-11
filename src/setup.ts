@@ -1,16 +1,30 @@
-import { getConfig, updateConfig, getDbPath, getReplicaPath, type Config } from "./db";
-import { createInterface } from "readline";
+import { createInterface } from "node:readline";
+import {
+  type Config,
+  getConfig,
+  getDbPath,
+  getReplicaPath,
+  updateConfig,
+} from "./db";
 
-function createPrompt(): { ask: (question: string) => Promise<string>; close: () => void } {
+function createPrompt(): {
+  ask: (question: string) => Promise<string>;
+  close: () => void;
+} {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return {
     ask: (question: string) =>
-      new Promise((resolve) => rl.question(question, (answer) => resolve(answer.trim()))),
+      new Promise((resolve) =>
+        rl.question(question, (answer) => resolve(answer.trim())),
+      ),
     close: () => rl.close(),
   };
 }
 
-async function testTursoConnection(url: string, authToken: string): Promise<boolean> {
+async function testTursoConnection(
+  url: string,
+  authToken: string,
+): Promise<boolean> {
   try {
     const { createClient } = await import("@libsql/client");
     const client = createClient({ url, authToken });
@@ -44,10 +58,12 @@ This will configure where your habit data is stored.
 
   console.log("Choose a storage backend:\n");
   console.log("  1. Local SQLite (default)");
-  console.log("     Data stays on this machine at " + getDbPath());
+  console.log(`     Data stays on this machine at ${getDbPath()}`);
   console.log("");
   console.log("  2. Turso Cloud");
-  console.log("     SQLite hosted in the cloud with local replica for offline use");
+  console.log(
+    "     SQLite hosted in the cloud with local replica for offline use",
+  );
   console.log("");
 
   const choice = await prompt.ask("Enter 1 or 2: ");
@@ -76,7 +92,9 @@ async function setupLocal(
     console.log("  Your Turso credentials are still saved in config.");
     console.log("  Run `habits setup` again to switch back anytime.\n");
 
-    const migrate = await prompt.ask("Migrate data from Turso to local? (y/n): ");
+    const migrate = await prompt.ask(
+      "Migrate data from Turso to local? (y/n): ",
+    );
     if (migrate.toLowerCase() === "y") {
       const { migrateTursoToLocal } = await import("./migrate");
       await migrateTursoToLocal();
@@ -158,7 +176,9 @@ You can also set these as environment variables instead:
   console.log("\n  Testing connection...");
   const ok = await testTursoConnection(url, authToken);
   if (!ok) {
-    const retry = await prompt.ask("\nRetry with different credentials? (y/n): ");
+    const retry = await prompt.ask(
+      "\nRetry with different credentials? (y/n): ",
+    );
     if (retry.toLowerCase() === "y") {
       return setupTurso(prompt, config);
     }
@@ -179,7 +199,9 @@ You can also set these as environment variables instead:
   console.log(`  Local replica: ${getReplicaPath()}`);
 
   if (wasLocal) {
-    const migrate = await prompt.ask("\nMigrate existing local data to Turso? (y/n): ");
+    const migrate = await prompt.ask(
+      "\nMigrate existing local data to Turso? (y/n): ",
+    );
     if (migrate.toLowerCase() === "y") {
       const { migrateLocalToTurso } = await import("./migrate");
       await migrateLocalToTurso();

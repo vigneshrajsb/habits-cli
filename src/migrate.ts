@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { getConfig, getDbPath, getReplicaPath, initDb, type DbClient } from "./db";
+import { type DbClient, getConfig, getDbPath, getReplicaPath } from "./db";
 
 interface HabitRow {
   id: number;
@@ -85,7 +85,11 @@ async function getTursoWrapper() {
   return { TursoDbClient };
 }
 
-function createLocalClient(): { all: <T>(sql: string) => T[]; run: (sql: string, ...params: any[]) => void; close: () => void } {
+function createLocalClient(): {
+  all: <T>(sql: string) => T[];
+  run: (sql: string, ...params: any[]) => void;
+  close: () => void;
+} {
   const db = new Database(getDbPath());
   return {
     all: <T>(sql: string) => db.query(sql).all() as T[],
@@ -141,26 +145,40 @@ export async function migrateLocalToTurso() {
   const logs = local.all<HabitLogRow>("SELECT * FROM habit_logs");
   const entries = local.all<JournalRow>("SELECT * FROM journal");
 
-  console.log(`  Found: ${habits.length} habits, ${logs.length} logs, ${entries.length} journal entries`);
+  console.log(
+    `  Found: ${habits.length} habits, ${logs.length} logs, ${entries.length} journal entries`,
+  );
 
   for (const h of habits) {
     await turso.run(
       "INSERT OR REPLACE INTO habits (id, name, emoji, frequency, active, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-      h.id, h.name, h.emoji, h.frequency, h.active, h.created_at
+      h.id,
+      h.name,
+      h.emoji,
+      h.frequency,
+      h.active,
+      h.created_at,
     );
   }
 
   for (const l of logs) {
     await turso.run(
       "INSERT OR REPLACE INTO habit_logs (id, habit_id, logged_at, notes) VALUES (?, ?, ?, ?)",
-      l.id, l.habit_id, l.logged_at, l.notes
+      l.id,
+      l.habit_id,
+      l.logged_at,
+      l.notes,
     );
   }
 
   for (const e of entries) {
     await turso.run(
       "INSERT OR REPLACE INTO journal (id, date, content, mood, updated_at) VALUES (?, ?, ?, ?, ?)",
-      e.id, e.date, e.content, e.mood, e.updated_at
+      e.id,
+      e.date,
+      e.content,
+      e.mood,
+      e.updated_at,
     );
   }
 
@@ -210,26 +228,40 @@ export async function migrateTursoToLocal() {
   const logs = await turso.all<HabitLogRow>("SELECT * FROM habit_logs");
   const entries = await turso.all<JournalRow>("SELECT * FROM journal");
 
-  console.log(`  Found: ${habits.length} habits, ${logs.length} logs, ${entries.length} journal entries`);
+  console.log(
+    `  Found: ${habits.length} habits, ${logs.length} logs, ${entries.length} journal entries`,
+  );
 
   for (const h of habits) {
     local.run(
       "INSERT OR REPLACE INTO habits (id, name, emoji, frequency, active, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-      h.id, h.name, h.emoji, h.frequency, h.active, h.created_at
+      h.id,
+      h.name,
+      h.emoji,
+      h.frequency,
+      h.active,
+      h.created_at,
     );
   }
 
   for (const l of logs) {
     local.run(
       "INSERT OR REPLACE INTO habit_logs (id, habit_id, logged_at, notes) VALUES (?, ?, ?, ?)",
-      l.id, l.habit_id, l.logged_at, l.notes
+      l.id,
+      l.habit_id,
+      l.logged_at,
+      l.notes,
     );
   }
 
   for (const e of entries) {
     local.run(
       "INSERT OR REPLACE INTO journal (id, date, content, mood, updated_at) VALUES (?, ?, ?, ?, ?)",
-      e.id, e.date, e.content, e.mood, e.updated_at
+      e.id,
+      e.date,
+      e.content,
+      e.mood,
+      e.updated_at,
     );
   }
 
