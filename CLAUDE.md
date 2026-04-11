@@ -11,23 +11,21 @@ cp ~/.habits/habits.db ~/.habits/habits.db.bak
 
 ## Release Process
 
-When releasing a new version:
+Use conventional commit prefixes (`feat:`, `fix:`, `chore:`, `docs:`) — these are parsed to auto-generate release notes.
 
 ```bash
-# 1. Bump version (creates commit + tag)
-npm version patch|minor|major -m "Release %s - description"
+# One-command release (bumps, commits, pushes tag)
+bun run release:patch   # bug fixes
+bun run release:minor   # new features
+bun run release:major   # breaking changes
 
-# 2. Push (GitHub Actions publishes to npm)
-git push && git push --tags
+# GitHub Actions will: publish to npm + create GitHub Release with changelog
 
-# 3. UPDATE GLOBAL INSTALL (don't forget!)
+# UPDATE GLOBAL INSTALL (don't forget!)
 npm install -g @vigneshrajsb/habits-cli@latest
-
-# 4. Verify
-npm list -g @vigneshrajsb/habits-cli
 ```
 
-> ⚠️ Step 3 is critical! Dashboard uses the global `habits` command.
+> ⚠️ Global install update is critical! Dashboard uses the global `habits` command.
 
 ## For Agents
 
