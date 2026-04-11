@@ -50,6 +50,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@clack/prompts": "^1.2.0",
     "@libsql/client": "^0.17.2"
   }
 }
