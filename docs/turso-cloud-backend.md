@@ -85,23 +85,21 @@ interface DbClient {
 
 ### `src/setup.ts` — New file: interactive setup wizard
 
+Uses `@clack/prompts` for polished arrow-key selection, spinners, and validation.
+
 The `habits setup` command flow:
 
-1. **Welcome message** — explains what the setup does
-2. **Backend choice** — prompt: local or Turso?
-3. **If Turso selected**:
-   a. Print step-by-step Turso setup instructions:
-      - Install Turso CLI: `curl -sSfL https://get.tur.so/install.sh | bash`
-      - Sign up: `turso auth signup`
-      - Create database: `turso db create habits`
-      - Get URL: `turso db show habits --url`
-      - Get token: `turso db tokens create habits`
-   b. Prompt user to paste their DB URL
-   c. Prompt user to paste their auth token
-   d. Test connection (attempt to connect and run a simple query)
-   e. If test passes, save to config
-   f. If existing local data found, offer to migrate
-4. **If local selected**:
+1. **Backend choice** — arrow-key select: Local SQLite or Turso Cloud
+2. **If Turso selected**, choose method:
+   - **Automatic** (recommended):
+     a. Check/install Turso CLI automatically (fallback to manual on failure)
+     b. Check auth status; if not authed, prompt signup vs login → opens browser
+     c. Create `habits` database (reuse if already exists)
+     d. Auto-generate auth token
+     e. Test connection
+     f. Save config
+   - **Manual**: show instructions, prompt for URL and token
+3. **If local selected**:
    - Set `backend: "local"` in config
    - If switching from Turso with existing cloud data, offer to migrate down
 5. **Confirmation** — print summary of configuration
