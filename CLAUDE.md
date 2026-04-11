@@ -42,10 +42,14 @@ habits mood 4             # set mood (1-5)
 habits journal write "x"  # add journal entry
 habits streak             # visual streak (7 days)
 habits history            # monthly view
+habits setup              # configure storage backend
+habits config             # show config
+habits db                 # show database info
 ```
 
 ## Key Points
 
 - Use `--json` for programmatic access
-- Data lives in `~/.habits/habits.db`
+- Data lives in `~/.habits/habits.db` (local) or Turso cloud with local replica
+- Supports local SQLite and Turso cloud backends (run `habits setup` to configure)
 - You orchestrate; the CLI manages data

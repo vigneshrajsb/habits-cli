@@ -1,4 +1,4 @@
-import { db, getConfig } from "./db";
+import { getDb, getConfig } from "./db";
 
 export interface Habit {
   id: number;
@@ -16,100 +16,102 @@ export interface HabitLog {
   notes: string | null;
 }
 
-// Get today's date in YYYY-MM-DD format (uses configured timezone)
 function today(): string {
   const config = getConfig();
   const now = new Date();
-  
+
   if (config.timezone) {
-    // Use Intl to get date parts in the configured timezone
     const formatter = new Intl.DateTimeFormat("en-CA", {
       timeZone: config.timezone,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
     });
-    // en-CA format gives us YYYY-MM-DD
     return formatter.format(now);
   }
-  
-  // Fallback: use local system time (not UTC)
+
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-export function addHabit(name: string, emoji?: string, frequency: string = "daily"): Habit {
-  const stmt = db.prepare(
-    "INSERT INTO habits (name, emoji, frequency) VALUES (?, ?, ?) RETURNING *"
-  );
-  return stmt.get(name, emoji || null, frequency) as Habit;
+export async function addHabit(name: string, emoji?: string, frequency: string = "daily"): Promise<Habit> {
+  const db = await getDb();
+  return (await db.get<Habit>(
+    "INSERT INTO habits (name, emoji, frequency) VALUES (?, ?, ?) RETURNING *",
+    name, emoji || null, frequency
+  ))!;
 }
 
-export function listHabits(includeInactive: boolean = false): Habit[] {
+export async function listHabits(includeInactive: boolean = false): Promise<Habit[]> {
+  const db = await getDb();
   const query = includeInactive
     ? "SELECT * FROM habits ORDER BY created_at"
     : "SELECT * FROM habits WHERE active = 1 ORDER BY created_at";
-  return db.query(query).all() as Habit[];
+  return db.all<Habit>(query);
 }
 
-export function getHabit(nameOrId: string | number): Habit | null {
-  const stmt = db.prepare(
-    "SELECT * FROM habits WHERE id = ? OR LOWER(name) = LOWER(?)"
+export async function getHabit(nameOrId: string | number): Promise<Habit | null> {
+  const db = await getDb();
+  return db.get<Habit>(
+    "SELECT * FROM habits WHERE id = ? OR LOWER(name) = LOWER(?)",
+    nameOrId, nameOrId
   );
-  return stmt.get(nameOrId, nameOrId) as Habit | null;
 }
 
-export function logHabit(nameOrId: string | number, date?: string, notes?: string): boolean {
-  const habit = getHabit(nameOrId);
+export async function logHabit(nameOrId: string | number, date?: string, notes?: string): Promise<boolean> {
+  const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
+  const db = await getDb();
   const logDate = date || today();
-  const stmt = db.prepare(
-    "INSERT OR REPLACE INTO habit_logs (habit_id, logged_at, notes) VALUES (?, ?, ?)"
+  await db.run(
+    "INSERT OR REPLACE INTO habit_logs (habit_id, logged_at, notes) VALUES (?, ?, ?)",
+    habit.id, logDate, notes || null
   );
-  stmt.run(habit.id, logDate, notes || null);
   return true;
 }
 
-export function unlogHabit(nameOrId: string | number, date?: string): boolean {
-  const habit = getHabit(nameOrId);
+export async function unlogHabit(nameOrId: string | number, date?: string): Promise<boolean> {
+  const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
+  const db = await getDb();
   const logDate = date || today();
-  const stmt = db.prepare("DELETE FROM habit_logs WHERE habit_id = ? AND logged_at = ?");
-  stmt.run(habit.id, logDate);
+  await db.run("DELETE FROM habit_logs WHERE habit_id = ? AND logged_at = ?", habit.id, logDate);
   return true;
 }
 
-export function getLogsForDate(date?: string): { habit: Habit; logged: boolean; notes: string | null }[] {
+export async function getLogsForDate(date?: string): Promise<{ habit: Habit; logged: boolean; notes: string | null }[]> {
+  const db = await getDb();
   const targetDate = date || today();
-  const habits = listHabits();
-  
-  const logStmt = db.prepare(
-    "SELECT * FROM habit_logs WHERE habit_id = ? AND logged_at = ?"
-  );
+  const habits = await listHabits();
 
-  return habits.map((habit) => {
-    const log = logStmt.get(habit.id, targetDate) as HabitLog | null;
-    return {
+  const results: { habit: Habit; logged: boolean; notes: string | null }[] = [];
+  for (const habit of habits) {
+    const log = await db.get<HabitLog>(
+      "SELECT * FROM habit_logs WHERE habit_id = ? AND logged_at = ?",
+      habit.id, targetDate
+    );
+    results.push({
       habit,
       logged: !!log,
       notes: log?.notes || null,
-    };
-  });
+    });
+  }
+  return results;
 }
 
-export function logMultiple(indices: number[], date?: string): { logged: string[]; failed: string[] } {
-  const habits = listHabits();
+export async function logMultiple(indices: number[], date?: string): Promise<{ logged: string[]; failed: string[] }> {
+  const habits = await listHabits();
   const logged: string[] = [];
   const failed: string[] = [];
 
   for (const idx of indices) {
     if (idx >= 1 && idx <= habits.length) {
       const habit = habits[idx - 1]!;
-      if (logHabit(habit.id, date)) {
+      if (await logHabit(habit.id, date)) {
         logged.push(habit.name);
       } else {
         failed.push(habit.name);
@@ -120,12 +122,11 @@ export function logMultiple(indices: number[], date?: string): { logged: string[
   return { logged, failed };
 }
 
-// Helper to get date string N days ago in configured timezone
 function getDateOffset(daysAgo: number): string {
   const config = getConfig();
   const now = new Date();
   now.setDate(now.getDate() - daysAgo);
-  
+
   if (config.timezone) {
     const formatter = new Intl.DateTimeFormat("en-CA", {
       timeZone: config.timezone,
@@ -135,27 +136,28 @@ function getDateOffset(daysAgo: number): string {
     });
     return formatter.format(now);
   }
-  
+
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-export function getStreak(nameOrId: string | number): number {
-  const habit = getHabit(nameOrId);
+export async function getStreak(nameOrId: string | number): Promise<number> {
+  const habit = await getHabit(nameOrId);
   if (!habit) return 0;
 
-  const logs = db.query(
-    "SELECT logged_at FROM habit_logs WHERE habit_id = ? ORDER BY logged_at DESC"
-  ).all(habit.id) as { logged_at: string }[];
+  const db = await getDb();
+  const logs = await db.all<{ logged_at: string }>(
+    "SELECT logged_at FROM habit_logs WHERE habit_id = ? ORDER BY logged_at DESC",
+    habit.id
+  );
 
   if (logs.length === 0) return 0;
 
   let streak = 0;
   const todayStr = getDateOffset(0);
-  
-  // Check if today is logged, if not start from yesterday
+
   let daysBack = logs[0]!.logged_at === todayStr ? 0 : 1;
 
   for (const log of logs) {
@@ -171,31 +173,34 @@ export function getStreak(nameOrId: string | number): number {
   return streak;
 }
 
-export function deactivateHabit(nameOrId: string | number): boolean {
-  const habit = getHabit(nameOrId);
+export async function deactivateHabit(nameOrId: string | number): Promise<boolean> {
+  const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
-  db.prepare("UPDATE habits SET active = 0 WHERE id = ?").run(habit.id);
+  const db = await getDb();
+  await db.run("UPDATE habits SET active = 0 WHERE id = ?", habit.id);
   return true;
 }
 
-export function activateHabit(nameOrId: string | number): boolean {
-  const habit = getHabit(nameOrId);
+export async function activateHabit(nameOrId: string | number): Promise<boolean> {
+  const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
-  db.prepare("UPDATE habits SET active = 1 WHERE id = ?").run(habit.id);
+  const db = await getDb();
+  await db.run("UPDATE habits SET active = 1 WHERE id = ?", habit.id);
   return true;
 }
 
-export function updateHabit(nameOrId: string | number, updates: { name?: string; emoji?: string }): boolean {
-  const habit = getHabit(nameOrId);
+export async function updateHabit(nameOrId: string | number, updates: { name?: string; emoji?: string }): Promise<boolean> {
+  const habit = await getHabit(nameOrId);
   if (!habit) return false;
 
+  const db = await getDb();
   if (updates.name) {
-    db.prepare("UPDATE habits SET name = ? WHERE id = ?").run(updates.name, habit.id);
+    await db.run("UPDATE habits SET name = ? WHERE id = ?", updates.name, habit.id);
   }
   if (updates.emoji) {
-    db.prepare("UPDATE habits SET emoji = ? WHERE id = ?").run(updates.emoji, habit.id);
+    await db.run("UPDATE habits SET emoji = ? WHERE id = ?", updates.emoji, habit.id);
   }
   return true;
 }

@@ -136,17 +136,40 @@ habits add "Reading" --emoji 📖
 > 
 > Ask 'how are my habits?' anytime to see your streaks."
 
-## Database Info
+## Storage Backend
 
+The CLI supports two storage backends:
+
+### Local (default)
 - **Location**: `~/.habits/habits.db`
 - **Format**: SQLite (portable, queryable)
 - **Backup**: Copy the file to back up all data
 - **Privacy**: Local only, never transmitted
 
-To show the user their DB path:
+### Turso Cloud
+- **Remote**: Cloud-hosted SQLite via Turso
+- **Local replica**: `~/.habits/replica.db` (syncs every 60s)
+- **Offline**: Works offline via embedded replica, syncs when online
+- **Setup**: Run `habits setup` to configure
+
 ```bash
-habits db
-# /home/user/.habits/habits.db
+habits db         # show backend info and paths
+habits config     # show full config including backend
+habits setup      # interactive backend setup wizard
+```
+
+### Switching Backends
+
+```bash
+habits setup
+# Walks through backend choice, Turso credential input,
+# connection testing, and optional data migration
+```
+
+Turso credentials can also be set via environment variables:
+```bash
+export TURSO_DATABASE_URL="libsql://..."
+export TURSO_AUTH_TOKEN="eyJ..."
 ```
 
 ## Installation

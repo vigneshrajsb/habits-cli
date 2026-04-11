@@ -1,11 +1,8 @@
 #!/usr/bin/env bun
 import { parseArgs } from "util";
-import { initDb, getDbPath, getConfig, updateConfig } from "./db";
+import { initDb, getDbPath, getReplicaPath, getConfig, updateConfig } from "./db";
 import * as habits from "./habits";
 import * as journal from "./journal";
-
-// Initialize database on startup
-initDb();
 
 const HELP = `
 habits - CLI for habit tracking and journaling
@@ -17,7 +14,7 @@ COMMANDS:
   today                     Show today's habits, mood, and journal
   week                      Show last 7 days summary
   history [mmyy]            Show monthly history (default: current month)
-  
+
   list                      List all active habits
   add <name>                Add a new habit (--emoji, --frequency)
   log <name|num>            Log a habit as done (--date, --notes)
@@ -26,18 +23,20 @@ COMMANDS:
   streak [name] [N]         Show streak visual (default: all habits, 7 days)
   deactivate <name>         Deactivate a habit
   activate <name>           Reactivate a habit
-  
+
   journal write "text"      Add to today's journal (--date)
   journal read              Read today's journal (--date, --last N)
   journal search "query"    Search journal entries
-  
+
   mood <1-5>                Set today's mood (--date)
   mood history [N]          Show mood history (default: 7 days)
-  
+
+  setup                     Interactive backend setup wizard
   config                    Show current config
   config timezone <tz>      Set timezone (e.g., America/Los_Angeles)
-  
-  db                        Show database path
+  config backend            Show current storage backend
+
+  db                        Show database info
 
 OPTIONS:
   --json                    Output as JSON
@@ -51,6 +50,7 @@ EXAMPLES:
   habits streak gym 14
   habits mood 4
   habits journal write "Great day"
+  habits setup
   habits config timezone America/Los_Angeles
 `;
 
@@ -64,15 +64,14 @@ function formatDateShort(dateStr: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// Get date in configured timezone
 function getDateInTimezone(offsetDays: number = 0): string {
   const config = getConfig();
   const now = new Date();
-  
+
   if (offsetDays !== 0) {
     now.setDate(now.getDate() - offsetDays);
   }
-  
+
   if (config.timezone) {
     const formatter = new Intl.DateTimeFormat("en-CA", {
       timeZone: config.timezone,
@@ -82,8 +81,7 @@ function getDateInTimezone(offsetDays: number = 0): string {
     });
     return formatter.format(now);
   }
-  
-  // Fallback: use local system time
+
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
@@ -98,10 +96,10 @@ function today(): string {
   return getDateInTimezone(0);
 }
 
-function showToday(asJson: boolean, date?: string) {
+async function showToday(asJson: boolean, date?: string) {
   const targetDate = date || today();
-  const habitLogs = habits.getLogsForDate(targetDate);
-  const entry = journal.getEntry(targetDate);
+  const habitLogs = await habits.getLogsForDate(targetDate);
+  const entry = await journal.getEntry(targetDate);
 
   if (asJson) {
     console.log(JSON.stringify({
@@ -121,7 +119,7 @@ function showToday(asJson: boolean, date?: string) {
   }
 
   console.log(`\n📅 ${formatDate(targetDate)}\n`);
-  
+
   console.log("Habits:");
   if (habitLogs.length === 0) {
     console.log("  (no habits configured)");
@@ -136,23 +134,23 @@ function showToday(asJson: boolean, date?: string) {
   console.log("");
   const moodStr = entry?.mood ? `${entry.mood} ${journal.moodToEmoji(entry.mood)}` : "(not set)";
   console.log(`Mood: ${moodStr}`);
-  
+
   console.log("");
   console.log(`Journal: ${entry?.content || "(empty)"}`);
   console.log("");
 }
 
-function showWeek(asJson: boolean) {
-  showDaysHistory(7, asJson);
+async function showWeek(asJson: boolean) {
+  await showDaysHistory(7, asJson);
 }
 
-function showDaysHistory(numDays: number, asJson: boolean) {
+async function showDaysHistory(numDays: number, asJson: boolean) {
   const days: any[] = [];
 
   for (let i = numDays - 1; i >= 0; i--) {
     const dateStr = getDaysAgo(i);
-    const habitLogs = habits.getLogsForDate(dateStr);
-    const entry = journal.getEntry(dateStr);
+    const habitLogs = await habits.getLogsForDate(dateStr);
+    const entry = await journal.getEntry(dateStr);
 
     days.push({
       date: dateStr,
@@ -171,10 +169,10 @@ function showDaysHistory(numDays: number, asJson: boolean) {
     return;
   }
 
-  const allHabits = habits.listHabits();
-  
+  const allHabits = await habits.listHabits();
+
   console.log(`\n📊 Last ${numDays} Days\n`);
-  
+
   const header = ["Date", ...allHabits.map((h) => h.emoji || h.name.slice(0, 3)), "Mood"];
   console.log(header.join("\t"));
   console.log("-".repeat(50));
@@ -188,10 +186,10 @@ function showDaysHistory(numDays: number, asJson: boolean) {
   console.log("");
 }
 
-function showHabitStreak(habitName: string | null, numDays: number, asJson: boolean) {
-  const targetHabits = habitName 
-    ? [habits.getHabit(habitName)].filter(Boolean) as habits.Habit[]
-    : habits.listHabits();
+async function showHabitStreak(habitName: string | null, numDays: number, asJson: boolean) {
+  const targetHabits = habitName
+    ? [await habits.getHabit(habitName)].filter(Boolean) as habits.Habit[]
+    : await habits.listHabits();
 
   if (targetHabits.length === 0) {
     console.error(habitName ? `❌ Habit not found: ${habitName}` : "No habits configured.");
@@ -201,12 +199,12 @@ function showHabitStreak(habitName: string | null, numDays: number, asJson: bool
   const results: any[] = [];
 
   for (const habit of targetHabits) {
-    const streak = habits.getStreak(habit.id);
+    const streak = await habits.getStreak(habit.id);
     const days: { date: string; logged: boolean }[] = [];
 
     for (let i = numDays - 1; i >= 0; i--) {
       const dateStr = getDaysAgo(i);
-      const logs = habits.getLogsForDate(dateStr);
+      const logs = await habits.getLogsForDate(dateStr);
       const habitLog = logs.find((l) => l.habit.id === habit.id);
       days.push({ date: dateStr, logged: habitLog?.logged || false });
     }
@@ -234,12 +232,12 @@ function showHabitStreak(habitName: string | null, numDays: number, asJson: bool
   console.log("");
 }
 
-function showMoodHistory(numDays: number, asJson: boolean) {
+async function showMoodHistory(numDays: number, asJson: boolean) {
   const days: { date: string; mood: number | null; emoji: string }[] = [];
 
   for (let i = numDays - 1; i >= 0; i--) {
     const dateStr = getDaysAgo(i);
-    const entry = journal.getEntry(dateStr);
+    const entry = await journal.getEntry(dateStr);
     days.push({
       date: dateStr,
       mood: entry?.mood || null,
@@ -253,7 +251,7 @@ function showMoodHistory(numDays: number, asJson: boolean) {
   }
 
   console.log(`\n😊 Mood History (last ${numDays} days)\n`);
-  
+
   const visual = days.map((d) => d.emoji).join(" ");
   console.log(visual);
   console.log("");
@@ -261,7 +259,7 @@ function showMoodHistory(numDays: number, asJson: boolean) {
   const start = formatDateShort(days[0]!.date);
   const end = formatDateShort(days[days.length - 1]!.date);
   console.log(`${start} → ${end}`);
-  
+
   const moodsWithValues = days.filter((d) => d.mood !== null);
   if (moodsWithValues.length > 0) {
     const avg = moodsWithValues.reduce((sum, d) => sum + (d.mood || 0), 0) / moodsWithValues.length;
@@ -270,7 +268,7 @@ function showMoodHistory(numDays: number, asJson: boolean) {
   console.log("");
 }
 
-function showMonthHistory(mmyy: string | null, asJson: boolean) {
+async function showMonthHistory(mmyy: string | null, asJson: boolean) {
   let year: number, month: number;
 
   if (mmyy) {
@@ -287,13 +285,13 @@ function showMonthHistory(mmyy: string | null, asJson: boolean) {
   }
 
   const lastDay = new Date(year, month, 0).getDate();
-  const allHabits = habits.listHabits();
+  const allHabits = await habits.listHabits();
   const days: any[] = [];
 
   for (let day = 1; day <= lastDay; day++) {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const habitLogs = habits.getLogsForDate(dateStr);
-    const entry = journal.getEntry(dateStr);
+    const habitLogs = await habits.getLogsForDate(dateStr);
+    const entry = await journal.getEntry(dateStr);
 
     days.push({
       date: dateStr,
@@ -336,6 +334,15 @@ async function main() {
     return;
   }
 
+  // Setup doesn't need db init
+  if (args[0] === "setup") {
+    const { runSetup } = await import("./setup");
+    await runSetup();
+    return;
+  }
+
+  await initDb();
+
   const { values, positionals } = parseArgs({
     args,
     options: {
@@ -357,22 +364,40 @@ async function main() {
 
   switch (command) {
     case "today":
-      showToday(asJson, date);
+      await showToday(asJson, date);
       break;
 
     case "week":
-      showWeek(asJson);
+      await showWeek(asJson);
       break;
 
     case "history": {
       const mmyy = positionals[1] || null;
-      showMonthHistory(mmyy, asJson);
+      await showMonthHistory(mmyy, asJson);
       break;
     }
 
-    case "db":
-      console.log(getDbPath());
+    case "db": {
+      const config = getConfig();
+      const backend = config.backend || "local";
+      if (asJson) {
+        console.log(JSON.stringify({
+          backend,
+          path: backend === "turso" ? getReplicaPath() : getDbPath(),
+          ...(backend === "turso" ? { remote: config.turso?.url || "(env vars)" } : {}),
+        }, null, 2));
+      } else {
+        console.log(`\nBackend: ${backend}`);
+        if (backend === "turso") {
+          console.log(`Local replica: ${getReplicaPath()}`);
+          console.log(`Remote: ${config.turso?.url || "(using env vars)"}`);
+        } else {
+          console.log(`Database: ${getDbPath()}`);
+        }
+        console.log("");
+      }
       break;
+    }
 
     case "config": {
       if (subcommand === "timezone") {
@@ -382,7 +407,6 @@ async function main() {
           console.error("Example: habits config timezone America/Los_Angeles");
           process.exit(1);
         }
-        // Validate timezone
         try {
           new Intl.DateTimeFormat("en-US", { timeZone: tz });
         } catch {
@@ -392,13 +416,29 @@ async function main() {
         updateConfig({ timezone: tz });
         console.log(`✅ Timezone set: ${tz}`);
         console.log(`   Today is now: ${today()}`);
+      } else if (subcommand === "backend") {
+        const config = getConfig();
+        const backend = config.backend || "local";
+        if (asJson) {
+          console.log(JSON.stringify({ backend }, null, 2));
+        } else {
+          console.log(`Backend: ${backend}`);
+        }
       } else {
         const config = getConfig();
         if (asJson) {
-          console.log(JSON.stringify(config, null, 2));
+          const display = { ...config };
+          if (display.turso?.authToken) {
+            display.turso = { ...display.turso, authToken: "***" };
+          }
+          console.log(JSON.stringify(display, null, 2));
         } else {
           console.log("\n⚙️ Config\n");
           console.log(`Timezone: ${config.timezone || "(system default)"}`);
+          console.log(`Backend: ${config.backend || "local"}`);
+          if (config.backend === "turso") {
+            console.log(`Turso URL: ${config.turso?.url || "(env vars)"}`);
+          }
           console.log(`Today: ${today()}`);
           console.log("");
         }
@@ -406,9 +446,8 @@ async function main() {
       break;
     }
 
-    // Habit commands (flattened)
     case "list": {
-      const list = habits.listHabits();
+      const list = await habits.listHabits();
       if (asJson) {
         console.log(JSON.stringify(list, null, 2));
       } else {
@@ -430,7 +469,7 @@ async function main() {
         console.error("Usage: habits add <name> [--emoji X] [--frequency daily|weekly]");
         process.exit(1);
       }
-      const habit = habits.addHabit(name, values.emoji as string, values.frequency as string);
+      const habit = await habits.addHabit(name, values.emoji as string, values.frequency as string);
       if (asJson) {
         console.log(JSON.stringify(habit, null, 2));
       } else {
@@ -445,7 +484,7 @@ async function main() {
         console.error("Usage: habits log <name|number> [--date YYYY-MM-DD] [--notes text]");
         process.exit(1);
       }
-      const success = habits.logHabit(target, date, values.notes as string);
+      const success = await habits.logHabit(target, date, values.notes as string);
       if (asJson) {
         console.log(JSON.stringify({ success, habit: target, date: date || "today" }));
       } else if (success) {
@@ -463,7 +502,7 @@ async function main() {
         console.error("Usage: habits unlog <name|number> [--date YYYY-MM-DD]");
         process.exit(1);
       }
-      const success = habits.unlogHabit(target, date);
+      const success = await habits.unlogHabit(target, date);
       if (asJson) {
         console.log(JSON.stringify({ success, habit: target }));
       } else if (success) {
@@ -482,7 +521,7 @@ async function main() {
         process.exit(1);
       }
       const indices = nums.split(",").map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
-      const result = habits.logMultiple(indices, date);
+      const result = await habits.logMultiple(indices, date);
       if (asJson) {
         console.log(JSON.stringify(result, null, 2));
       } else {
@@ -515,7 +554,7 @@ async function main() {
         }
       }
 
-      showHabitStreak(habitName, numDays, asJson);
+      await showHabitStreak(habitName, numDays, asJson);
       break;
     }
 
@@ -525,7 +564,7 @@ async function main() {
         console.error("Usage: habits deactivate <name>");
         process.exit(1);
       }
-      const success = habits.deactivateHabit(target);
+      const success = await habits.deactivateHabit(target);
       if (asJson) {
         console.log(JSON.stringify({ success, habit: target }));
       } else if (success) {
@@ -543,7 +582,7 @@ async function main() {
         console.error("Usage: habits activate <name>");
         process.exit(1);
       }
-      const success = habits.activateHabit(target);
+      const success = await habits.activateHabit(target);
       if (asJson) {
         console.log(JSON.stringify({ success, habit: target }));
       } else if (success) {
@@ -555,7 +594,6 @@ async function main() {
       break;
     }
 
-    // Journal commands
     case "journal":
       switch (subcommand) {
         case "write": {
@@ -564,7 +602,7 @@ async function main() {
             console.error("Usage: habits journal write <text> [--date YYYY-MM-DD]");
             process.exit(1);
           }
-          const entry = journal.writeJournal(content, date);
+          const entry = await journal.writeJournal(content, date);
           if (asJson) {
             console.log(JSON.stringify(entry, null, 2));
           } else {
@@ -576,7 +614,7 @@ async function main() {
         case "read": {
           const last = values.last ? parseInt(values.last as string, 10) : undefined;
           if (last) {
-            const entries = journal.getRecentEntries(last);
+            const entries = await journal.getRecentEntries(last);
             if (asJson) {
               console.log(JSON.stringify(entries, null, 2));
             } else {
@@ -587,7 +625,7 @@ async function main() {
               });
             }
           } else {
-            const entry = journal.getEntry(date);
+            const entry = await journal.getEntry(date);
             if (asJson) {
               console.log(JSON.stringify(entry, null, 2));
             } else if (entry) {
@@ -607,7 +645,7 @@ async function main() {
             console.error("Usage: habits journal search <query>");
             process.exit(1);
           }
-          const results = journal.searchJournal(query);
+          const results = await journal.searchJournal(query);
           if (asJson) {
             console.log(JSON.stringify(results, null, 2));
           } else {
@@ -630,11 +668,10 @@ async function main() {
       }
       break;
 
-    // Mood commands
     case "mood": {
       if (subcommand === "history") {
         const numDays = positionals[2] ? parseInt(positionals[2], 10) : 7;
-        showMoodHistory(numDays, asJson);
+        await showMoodHistory(numDays, asJson);
       } else {
         const moodVal = parseInt(positionals[1] ?? "", 10);
         if (isNaN(moodVal) || moodVal < 1 || moodVal > 5) {
@@ -643,7 +680,7 @@ async function main() {
           console.log("  1 = 😞  2 = 😕  3 = 😐  4 = 🙂  5 = 😄");
           process.exit(1);
         }
-        const entry = journal.setMood(moodVal, date);
+        const entry = await journal.setMood(moodVal, date);
         if (asJson) {
           console.log(JSON.stringify(entry, null, 2));
         } else {
