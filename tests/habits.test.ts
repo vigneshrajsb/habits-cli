@@ -1,227 +1,224 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-// Set test mode BEFORE importing db
 process.env.HABITS_TEST = "1";
 
-import { db, initDb } from "../src/db";
+import { getDb, initDb } from "../src/db";
 import {
+  activateHabit,
   addHabit,
-  listHabits,
+  deactivateHabit,
   getHabit,
-  logHabit,
-  unlogHabit,
   getLogsForDate,
   getStreak,
-  deactivateHabit,
-  activateHabit,
+  listHabits,
+  logHabit,
+  unlogHabit,
   updateHabit,
 } from "../src/habits";
 
-// Initialize db once
-initDb();
+beforeAll(async () => {
+  await initDb();
+});
 
-// Clear before each test for isolation
-beforeEach(() => {
-  db.run("DELETE FROM habit_logs");
-  db.run("DELETE FROM habits");
+beforeEach(async () => {
+  const db = await getDb();
+  await db.run("DELETE FROM habit_logs");
+  await db.run("DELETE FROM habits");
 });
 
 describe("addHabit", () => {
-  test("adds a habit with name only", () => {
-    const habit = addHabit("Exercise");
-    
+  test("adds a habit with name only", async () => {
+    const habit = await addHabit("Exercise");
+
     expect(habit.id).toBeGreaterThan(0);
     expect(habit.name).toBe("Exercise");
     expect(habit.frequency).toBe("daily");
     expect(habit.active).toBe(1);
   });
 
-  test("adds a habit with emoji", () => {
-    const habit = addHabit("Meditate", "🧘");
-    
+  test("adds a habit with emoji", async () => {
+    const habit = await addHabit("Meditate", "🧘");
+
     expect(habit.name).toBe("Meditate");
     expect(habit.emoji).toBe("🧘");
   });
 
-  test("adds a habit with custom frequency", () => {
-    const habit = addHabit("Weekly Review", "📝", "weekly");
-    
+  test("adds a habit with custom frequency", async () => {
+    const habit = await addHabit("Weekly Review", "📝", "weekly");
+
     expect(habit.frequency).toBe("weekly");
   });
 });
 
 describe("listHabits", () => {
-  test("lists active habits", () => {
-    addHabit("Habit 1");
-    addHabit("Habit 2");
-    const habit3 = addHabit("Habit 3");
-    deactivateHabit(habit3.id);
+  test("lists active habits", async () => {
+    await addHabit("Habit 1");
+    await addHabit("Habit 2");
+    const habit3 = await addHabit("Habit 3");
+    await deactivateHabit(habit3.id);
 
-    const habits = listHabits();
+    const habits = await listHabits();
     expect(habits.length).toBe(2);
   });
 
-  test("includes inactive when requested", () => {
-    addHabit("Habit 1");
-    const habit2 = addHabit("Habit 2");
-    deactivateHabit(habit2.id);
+  test("includes inactive when requested", async () => {
+    await addHabit("Habit 1");
+    const habit2 = await addHabit("Habit 2");
+    await deactivateHabit(habit2.id);
 
-    const habits = listHabits(true);
+    const habits = await listHabits(true);
     expect(habits.length).toBe(2);
   });
 });
 
 describe("getHabit", () => {
-  test("gets habit by id", () => {
-    const added = addHabit("Test Habit");
-    const habit = getHabit(added.id);
+  test("gets habit by id", async () => {
+    const added = await addHabit("Test Habit");
+    const habit = await getHabit(added.id);
 
     expect(habit).not.toBeNull();
     expect(habit!.id).toBe(added.id);
   });
 
-  test("gets habit by name (case insensitive)", () => {
-    addHabit("Reading");
-    
-    const habit = getHabit("reading");
+  test("gets habit by name (case insensitive)", async () => {
+    await addHabit("Reading");
+
+    const habit = await getHabit("reading");
     expect(habit).not.toBeNull();
     expect(habit!.name).toBe("Reading");
   });
 
-  test("returns null for non-existent habit", () => {
-    const habit = getHabit(99999);
+  test("returns null for non-existent habit", async () => {
+    const habit = await getHabit(99999);
     expect(habit).toBeNull();
   });
 });
 
 describe("logHabit / unlogHabit", () => {
-  test("logs a habit for today", () => {
-    const habit = addHabit("Exercise");
-    
-    const result = logHabit(habit.id);
+  test("logs a habit for today", async () => {
+    const habit = await addHabit("Exercise");
+
+    const result = await logHabit(habit.id);
     expect(result).toBe(true);
 
-    const logs = getLogsForDate();
-    const exerciseLog = logs.find(l => l.habit.id === habit.id);
+    const logs = await getLogsForDate();
+    const exerciseLog = logs.find((l) => l.habit.id === habit.id);
     expect(exerciseLog?.logged).toBe(true);
   });
 
-  test("logs a habit for specific date", () => {
-    const habit = addHabit("Exercise");
-    
-    const result = logHabit(habit.id, "2026-01-15");
+  test("logs a habit for specific date", async () => {
+    const habit = await addHabit("Exercise");
+
+    const result = await logHabit(habit.id, "2026-01-15");
     expect(result).toBe(true);
 
-    const logs = getLogsForDate("2026-01-15");
-    const exerciseLog = logs.find(l => l.habit.id === habit.id);
+    const logs = await getLogsForDate("2026-01-15");
+    const exerciseLog = logs.find((l) => l.habit.id === habit.id);
     expect(exerciseLog?.logged).toBe(true);
   });
 
-  test("unlogs a habit", () => {
-    const habit = addHabit("Exercise");
-    logHabit(habit.id, "2026-01-15");
-    
-    const result = unlogHabit(habit.id, "2026-01-15");
+  test("unlogs a habit", async () => {
+    const habit = await addHabit("Exercise");
+    await logHabit(habit.id, "2026-01-15");
+
+    const result = await unlogHabit(habit.id, "2026-01-15");
     expect(result).toBe(true);
 
-    const logs = getLogsForDate("2026-01-15");
-    const exerciseLog = logs.find(l => l.habit.id === habit.id);
+    const logs = await getLogsForDate("2026-01-15");
+    const exerciseLog = logs.find((l) => l.habit.id === habit.id);
     expect(exerciseLog?.logged).toBe(false);
   });
 
-  test("returns false for non-existent habit", () => {
-    expect(logHabit(99999)).toBe(false);
-    expect(unlogHabit(99999)).toBe(false);
+  test("returns false for non-existent habit", async () => {
+    expect(await logHabit(99999)).toBe(false);
+    expect(await unlogHabit(99999)).toBe(false);
   });
 });
 
 describe("getLogsForDate", () => {
-  test("returns all habits with log status", () => {
-    const h1 = addHabit("Habit 1");
-    const h2 = addHabit("Habit 2");
-    logHabit(h1.id, "2026-01-15");
+  test("returns all habits with log status", async () => {
+    const h1 = await addHabit("Habit 1");
+    const h2 = await addHabit("Habit 2");
+    await logHabit(h1.id, "2026-01-15");
 
-    const logs = getLogsForDate("2026-01-15");
-    
+    const logs = await getLogsForDate("2026-01-15");
+
     expect(logs.length).toBe(2);
-    expect(logs.find(l => l.habit.id === h1.id)?.logged).toBe(true);
-    expect(logs.find(l => l.habit.id === h2.id)?.logged).toBe(false);
+    expect(logs.find((l) => l.habit.id === h1.id)?.logged).toBe(true);
+    expect(logs.find((l) => l.habit.id === h2.id)?.logged).toBe(false);
   });
 });
 
 describe("getStreak", () => {
-  test("returns 0 for no logs", () => {
-    const habit = addHabit("Exercise");
-    expect(getStreak(habit.id)).toBe(0);
+  test("returns 0 for no logs", async () => {
+    const habit = await addHabit("Exercise");
+    expect(await getStreak(habit.id)).toBe(0);
   });
 
-  test("calculates streak for consecutive days", () => {
-    const habit = addHabit("Exercise");
+  test("calculates streak for consecutive days", async () => {
+    const habit = await addHabit("Exercise");
     const today = new Date();
-    
-    // Log for today and past 2 days
+
     for (let i = 0; i < 3; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      logHabit(habit.id, date.toISOString().split("T")[0]);
+      await logHabit(habit.id, date.toISOString().split("T")[0]);
     }
 
-    expect(getStreak(habit.id)).toBe(3);
+    expect(await getStreak(habit.id)).toBe(3);
   });
 
-  test("breaks streak on gap", () => {
-    const habit = addHabit("Exercise");
+  test("breaks streak on gap", async () => {
+    const habit = await addHabit("Exercise");
     const today = new Date();
-    
-    // Log today
-    logHabit(habit.id, today.toISOString().split("T")[0]);
-    
-    // Log 3 days ago (gap of 1 day)
+
+    await logHabit(habit.id, today.toISOString().split("T")[0]);
+
     const threeDaysAgo = new Date(today);
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-    logHabit(habit.id, threeDaysAgo.toISOString().split("T")[0]);
+    await logHabit(habit.id, threeDaysAgo.toISOString().split("T")[0]);
 
-    expect(getStreak(habit.id)).toBe(1);
+    expect(await getStreak(habit.id)).toBe(1);
   });
 });
 
 describe("deactivateHabit / activateHabit", () => {
-  test("deactivates a habit", () => {
-    const habit = addHabit("Exercise");
-    
-    deactivateHabit(habit.id);
-    
-    const updated = getHabit(habit.id);
+  test("deactivates a habit", async () => {
+    const habit = await addHabit("Exercise");
+
+    await deactivateHabit(habit.id);
+
+    const updated = await getHabit(habit.id);
     expect(updated!.active).toBe(0);
   });
 
-  test("activates a habit", () => {
-    const habit = addHabit("Exercise");
-    deactivateHabit(habit.id);
-    
-    activateHabit(habit.id);
-    
-    const updated = getHabit(habit.id);
+  test("activates a habit", async () => {
+    const habit = await addHabit("Exercise");
+    await deactivateHabit(habit.id);
+
+    await activateHabit(habit.id);
+
+    const updated = await getHabit(habit.id);
     expect(updated!.active).toBe(1);
   });
 });
 
 describe("updateHabit", () => {
-  test("updates habit name", () => {
-    const habit = addHabit("Old Name");
-    
-    updateHabit(habit.id, { name: "New Name" });
-    
-    const updated = getHabit(habit.id);
+  test("updates habit name", async () => {
+    const habit = await addHabit("Old Name");
+
+    await updateHabit(habit.id, { name: "New Name" });
+
+    const updated = await getHabit(habit.id);
     expect(updated!.name).toBe("New Name");
   });
 
-  test("updates habit emoji", () => {
-    const habit = addHabit("Exercise");
-    
-    updateHabit(habit.id, { emoji: "💪" });
-    
-    const updated = getHabit(habit.id);
+  test("updates habit emoji", async () => {
+    const habit = await addHabit("Exercise");
+
+    await updateHabit(habit.id, { emoji: "💪" });
+
+    const updated = await getHabit(habit.id);
     expect(updated!.emoji).toBe("💪");
   });
 });
