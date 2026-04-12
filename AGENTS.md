@@ -65,6 +65,8 @@ habits mood history 7 --json
 
 ## Date Handling
 
+The `--date` flag requires strict `YYYY-MM-DD` format and validates that the date is a real calendar date (e.g., `2026-02-30` is rejected).
+
 ```bash
 habits log gym --date 2026-02-02
 habits mood 3 --date 2026-02-01
@@ -165,6 +167,8 @@ habits setup
 # Walks through backend choice, Turso credential input,
 # connection testing, and optional data migration
 ```
+
+Switching from Turso to local removes Turso credentials from the config file.
 
 Turso credentials can also be set via environment variables:
 ```bash

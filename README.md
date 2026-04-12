@@ -69,13 +69,13 @@ habits mood history 30    # last 30 days
 ### Options
 
 ```bash
---date YYYY-MM-DD         # specify date
+--date YYYY-MM-DD         # specify date (validated: must be real calendar date)
 --json                    # JSON output
 ```
 
 ## Data Storage
 
-Data stored in `~/.habits/habits.db` (SQLite).
+Data stored in `~/.habits/habits.db` (SQLite). The data directory is created with `0o700` and config file with `0o600` permissions (owner-only access).
 
 ```bash
 habits db                 # show path

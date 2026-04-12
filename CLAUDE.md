@@ -50,4 +50,7 @@ habits db                 # show database info
 - Use `--json` for programmatic access
 - Data lives in `~/.habits/habits.db` (local) or Turso cloud with local replica
 - Supports local SQLite and Turso cloud backends (run `habits setup` to configure)
+- `--date` flag enforces strict `YYYY-MM-DD` format with calendar validation
+- `~/.habits/` directory is created with `0o700` and config file with `0o600` permissions
+- Switching from Turso to local backend removes credentials from config on disk
 - You orchestrate; the CLI manages data
