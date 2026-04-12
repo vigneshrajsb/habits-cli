@@ -114,6 +114,29 @@ function today(): string {
   return getDateInTimezone(0);
 }
 
+function validateDate(date: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    console.error(`Invalid date format: ${date}`);
+    console.error("Expected format: YYYY-MM-DD (e.g., 2026-04-11)");
+    process.exit(1);
+  }
+
+  const [year, month, day] = date.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    console.error(`Invalid date: ${date} is not a real calendar date`);
+    process.exit(1);
+  }
+}
+
 async function showToday(asJson: boolean, date?: string) {
   const targetDate = date || today();
   const habitLogs = await habits.getLogsForDate(targetDate);
@@ -413,6 +436,9 @@ async function main() {
 
   const asJson = values.json as boolean;
   const date = values.date as string | undefined;
+  if (date !== undefined) {
+    validateDate(date);
+  }
   const command = positionals[0];
   const subcommand = positionals[1];
 

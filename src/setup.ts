@@ -39,26 +39,6 @@ function exec(
   }
 }
 
-function execShell(cmd: string): {
-  ok: boolean;
-  stdout: string;
-  stderr: string;
-} {
-  try {
-    const stdout = execFileSync("sh", ["-c", cmd], {
-      encoding: "utf-8",
-      stdio: "pipe",
-    }).trim();
-    return { ok: true, stdout, stderr: "" };
-  } catch (err: any) {
-    return {
-      ok: false,
-      stdout: (err.stdout || "").trim(),
-      stderr: (err.stderr || "").trim(),
-    };
-  }
-}
-
 function handleCancel(value: unknown): value is symbol {
   if (isCancel(value)) {
     cancel("Setup cancelled.");
@@ -131,14 +111,12 @@ export async function runSetup() {
 
 async function setupLocal(config: Config) {
   const wasOnTurso = config.backend === "turso";
-  updateConfig({ backend: "local" });
+  updateConfig({ backend: "local", turso: undefined });
 
   log.success(`Backend set to local\nDatabase: ${getDbPath()}`);
 
   if (wasOnTurso) {
-    log.info(
-      "Your Turso credentials are still saved. Run `habits setup` to switch back.",
-    );
+    log.info("Turso credentials have been removed from the config file.");
 
     const migrate = await confirm({
       message: "Migrate data from Turso to local?",
@@ -220,10 +198,23 @@ async function autoTursoSetup(config: Config) {
   if (isTursoCLIInstalled()) {
     log.success("Turso CLI already installed");
   } else {
+    const shouldInstall = await confirm({
+      message:
+        "Turso CLI is not installed. This will run: curl -sSfL https://get.tur.so/install.sh | bash — Proceed?",
+    });
+    if (handleCancel(shouldInstall)) return;
+
+    if (!shouldInstall) {
+      log.warn("Skipping Turso CLI install. Falling back to manual setup.");
+      await manualTursoSetup(config);
+      return;
+    }
+
     s.start("Installing Turso CLI...");
-    const install = execShell(
+    const install = exec("sh", [
+      "-c",
       "curl -sSfL https://get.tur.so/install.sh | bash",
-    );
+    ]);
     if (!install.ok) {
       s.stop("Failed to install Turso CLI");
       log.warn("Falling back to manual setup.");
