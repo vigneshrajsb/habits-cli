@@ -68,6 +68,233 @@ EXAMPLES:
   habits config timezone America/Los_Angeles
 `;
 
+const SUBCOMMAND_HELP: Record<string, string> = {
+  today: `
+habits today - Show today's habits, mood, and journal
+
+USAGE:
+  habits today [--date YYYY-MM-DD] [--json]
+
+OPTIONS:
+  --date YYYY-MM-DD    Show a specific date (default: today)
+  --json               Output as JSON
+
+EXAMPLES:
+  habits today
+  habits today --date 2026-04-11
+  habits today --json
+`,
+  week: `
+habits week - Show last 7 days summary
+
+USAGE:
+  habits week [--json]
+
+OPTIONS:
+  --json    Output as JSON
+`,
+  history: `
+habits history - Show monthly history
+
+USAGE:
+  habits history [mmyy] [--json]
+
+ARGUMENTS:
+  mmyy    Month and year in mmyy format (default: current month)
+
+OPTIONS:
+  --json    Output as JSON
+
+EXAMPLES:
+  habits history
+  habits history 0226
+`,
+  list: `
+habits list - List all active habits
+
+USAGE:
+  habits list [--json]
+
+OPTIONS:
+  --json    Output as JSON
+`,
+  add: `
+habits add - Add a new habit
+
+USAGE:
+  habits add <name> [--emoji X] [--frequency daily|weekly]
+
+OPTIONS:
+  --emoji X              Emoji for the habit
+  --frequency daily|weekly    Tracking frequency (default: daily)
+
+EXAMPLES:
+  habits add "Workout" --emoji 💪
+  habits add "Reading" --emoji 📖 --frequency daily
+`,
+  log: `
+habits log - Log a habit as done
+
+USAGE:
+  habits log <name|number> [--date YYYY-MM-DD] [--notes text]
+
+OPTIONS:
+  --date YYYY-MM-DD    Specify date (default: today)
+  --notes text         Add notes to the log
+
+EXAMPLES:
+  habits log workout
+  habits log 1
+  habits log gym --date 2026-04-11 --notes "Heavy day"
+`,
+  unlog: `
+habits unlog - Remove a habit log
+
+USAGE:
+  habits unlog <name|number> [--date YYYY-MM-DD]
+
+OPTIONS:
+  --date YYYY-MM-DD    Specify date (default: today)
+
+EXAMPLES:
+  habits unlog workout
+  habits unlog 1 --date 2026-04-11
+`,
+  done: `
+habits done - Log multiple habits by number
+
+USAGE:
+  habits done <1,2,3> [--date YYYY-MM-DD]
+
+OPTIONS:
+  --date YYYY-MM-DD    Specify date (default: today)
+
+EXAMPLES:
+  habits done 1,3,4
+  habits done 1,2 --date 2026-04-11
+`,
+  streak: `
+habits streak - Show streak visualization
+
+USAGE:
+  habits streak [name] [days] [--json]
+
+ARGUMENTS:
+  name    Habit name (default: all habits)
+  days    Number of days to show (default: 7)
+
+OPTIONS:
+  --json    Output as JSON
+
+EXAMPLES:
+  habits streak
+  habits streak 14
+  habits streak gym
+  habits streak gym 30
+`,
+  deactivate: `
+habits deactivate - Deactivate a habit
+
+USAGE:
+  habits deactivate <name> [--json]
+
+OPTIONS:
+  --json    Output as JSON
+
+EXAMPLES:
+  habits deactivate workout
+`,
+  activate: `
+habits activate - Reactivate a habit
+
+USAGE:
+  habits activate <name> [--json]
+
+OPTIONS:
+  --json    Output as JSON
+
+EXAMPLES:
+  habits activate workout
+`,
+  journal: `
+habits journal - Journal entries
+
+USAGE:
+  habits journal write "text" [--date YYYY-MM-DD]
+  habits journal read [--date YYYY-MM-DD] [--last N]
+  habits journal search "query"
+
+OPTIONS:
+  --date YYYY-MM-DD    Specify date (default: today)
+  --last N             Read last N entries
+  --json               Output as JSON
+
+EXAMPLES:
+  habits journal write "Great day"
+  habits journal read
+  habits journal read --last 7
+  habits journal search "interview"
+`,
+  mood: `
+habits mood - Set or view mood
+
+USAGE:
+  habits mood <1-5> [--date YYYY-MM-DD]
+  habits mood history [days]
+
+SCALE:
+  1 = 😞  2 = 😕  3 = 😐  4 = 🙂  5 = 😄
+
+OPTIONS:
+  --date YYYY-MM-DD    Specify date (default: today)
+  --json               Output as JSON
+
+EXAMPLES:
+  habits mood 4
+  habits mood 3 --date 2026-04-11
+  habits mood history
+  habits mood history 30
+`,
+  setup: `
+habits setup - Interactive backend setup wizard
+
+USAGE:
+  habits setup
+
+Configures the storage backend (local SQLite or Turso cloud).
+Walks through credential input, connection testing, and data migration.
+`,
+  config: `
+habits config - View or update configuration
+
+USAGE:
+  habits config [--json]
+  habits config timezone <tz>
+  habits config backend [--json]
+
+SUBCOMMANDS:
+  timezone <tz>    Set timezone (IANA format)
+  backend          Show current storage backend
+
+OPTIONS:
+  --json    Output as JSON
+
+EXAMPLES:
+  habits config
+  habits config timezone America/Los_Angeles
+  habits config backend
+`,
+  db: `
+habits db - Show database info
+
+USAGE:
+  habits db [--json]
+
+OPTIONS:
+  --json    Output as JSON
+`,
+};
+
 function formatDate(dateStr: string): string {
   const d = new Date(`${dateStr}T12:00:00`);
   return d.toLocaleDateString("en-US", {
@@ -413,6 +640,10 @@ async function main() {
 
   // Setup doesn't need db init
   if (args[0] === "setup") {
+    if (args.includes("--help") || args.includes("-h")) {
+      console.log(SUBCOMMAND_HELP.setup);
+      return;
+    }
     const { runSetup } = await import("./setup");
     await runSetup();
     return;
@@ -441,6 +672,11 @@ async function main() {
   }
   const command = positionals[0];
   const subcommand = positionals[1];
+
+  if (values.help) {
+    console.log(SUBCOMMAND_HELP[command ?? ""] || HELP);
+    return;
+  }
 
   switch (command) {
     case "today":
